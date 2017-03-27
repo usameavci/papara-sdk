@@ -20,7 +20,7 @@ class PaPara
     
     public function __construct($mode = 'test')
     {
-        if (!in_array($mode, ['test', 'prod'])) {
+        if (!in_array($mode, array('test', 'prod'))) {
             throw new Exception("Api mode not valid! Available modes is only test or prod. ", 1);       
         }
         $this->mode = $mode;
@@ -131,12 +131,12 @@ class PaPara
 
         $requestBody = $this->getRequestBody();
 
-        $headers = [
+        $headers = array(
             'Content-type: text/xml; charset="utf-8"',
             'Host: ' . $_SERVER['HTTP_HOST'],
             'Content-length: ' . strlen($requestBody),
             'POST /posservice/ApiRequest.asmx HTTP/1.1',
-        ];
+        );
 
 
         $ch = curl_init();
@@ -154,11 +154,11 @@ class PaPara
 
         $response = simplexml_load_string($this->cleanResponse($response));
 
-        return (object) [
+        return (object) array(
             'message' => (string) $response->TransactionRequestResult->ResultMessage[0],
             'code' => (string) $response->TransactionRequestResult->ResultCode[0],
             'status' => (string) $response->TransactionRequestResult->ResultStatus,
-        ];
+        );
     }
 
     public function cleanResponse($response)
