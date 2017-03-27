@@ -2,9 +2,12 @@
 
 namespace UsameAvci\PaPara;
 
+use Exception;
 use SimpleXMLElement;
 use GuzzleHttp\Client as GuzzleClient;
-use Exception;
+use GuzzleHttp\Exception\ClientException as GuzzleClientException;
+use GuzzleHttp\Exception\ServerException as GuzzleServerException;
+use GuzzleHttp\Exception\RequestException as GuzzleRequestException;
 
 /**
 * PaPara Api Class
@@ -23,11 +26,11 @@ class PaPara
     public function __construct($mode = 'test')
     {
         if (count(self::$environments) < 1) {
-            throw new Exception("No api environments specified", 1);       
+            throw new PaParaException("No api environments specified", 1);       
         }
 
         if (!in_array($mode, array_keys(self::$environments))) {
-            throw new Exception("Api mode not valid! Available modes is only test or prod. ", 1);       
+            throw new PaParaException("Api mode not valid! Available modes is only test or prod. ", 1);       
         }
 
         $this->mode = $mode;
@@ -139,41 +142,51 @@ class PaPara
         $requestBody = $this->getRequestBody();
 
         $requestHeaders = array(
-            'Content-type: text/xml; charset="utf-8"',
-            'Host: ' . $_SERVER['HTTP_HOST'],
-            'Content-length: ' . strlen($requestBody),
+            'Content-Type' => 'text/xml; charset="utf-8"',
+            'Host' => $_SERVER['HTTP_HOST'],
+            'Content-Length' => strlen($requestBody),
         );
 
         $client = new GuzzleClient();
-        $res = $client->request('POST', $environments['url'], array(
-            'headers' => $requestHeaders,
-            'body' => $requestBody,
-        ));
-        
-        $response = json_decode($res->getBody());
 
-        var_dump($response);
-        exit();
+        try {
+            $response = $client->request('POST', $environments['url'], array(
+                'headers' => $requestHeaders,
+                'body' => $requestBody,
+            ));
+            $responseBody = $response->getBody()->getContents();
+            $response = $this->parseResponse($responseBody);
 
-        if ($res->getStatusCode() == 200) {
-            // $response = simplexml_load_string($this->cleanResponse($response));
-        }else {
-            // Error
+            if ($response->ResultCode != '100') {
+                throw new PaParaException($response->ResultMessage);
+            } else {
+                return $response;
+            }
+        } catch (GuzzleClientException $e) {
+            $statusCode = $e->getResponse()->getStatusCode();
+            if ($statusCode == 415) {
+                throw new PaParaException($e->getResponse()->getBody()->getContents());
+            } else if ($statusCode == 404) {
+                throw new PaParaException($e->getResponse()->getReasonPhrase());
+            }
+        } catch(GuzzleServerException $e){
+            $exceptionBody = $e->getResponse()->getBody()->getContents();
+            preg_match_all('#<soap:Text xml:lang="en">(.*)</soap:Text>#', $exceptionBody, $matches);
+            throw new PaParaException($matches[1][0]);
+        } catch (GuzzleRequestException $e) {
+            throw new PaParaException("Unknown error");
         }
 
-        // return (object) array(
-        //     'message' => (string) $response->TransactionRequestResult->ResultMessage[0],
-        //     'code' => (string) $response->TransactionRequestResult->ResultCode[0],
-        //     'status' => (string) $response->TransactionRequestResult->ResultStatus,
-        // );
     }
 
-    public function cleanResponse($response)
+    public function parseResponse($response)
     {
         $response = str_replace("<soap:Body>", "", $response);
         $response = str_replace("</soap:Body>", "", $response);
         $response = str_replace('<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">', "", $response);
         $response = str_replace("</soap:Envelope>", "", $response);
+        $response = simplexml_load_string($response);
+        $response = (object) json_decode(json_encode($response->TransactionRequestResult), 1);
         return $response;
     }
 }
