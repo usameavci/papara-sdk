@@ -1,6 +1,6 @@
 {
     "name": "usameavci/papara-sdk",
-    "description": "PaPara siimple integration class",
+    "description": "PaPara simple integration class",
     "keywords": ["papara", "integration", "sdk"],
     "type": "library",
     "license": "MIT",
