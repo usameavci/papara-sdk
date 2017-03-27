@@ -3,6 +3,8 @@
 namespace UsameAvci\PaPara;
 
 use SimpleXMLElement;
+use GuzzleHttp\Client as GuzzleClient;
+use Exception;
 
 /**
 * PaPara Api Class
@@ -20,9 +22,14 @@ class PaPara
     
     public function __construct($mode = 'test')
     {
-        if (!in_array($mode, ['test', 'prod'])) {
+        if (count(self::$environments) < 1) {
+            throw new Exception("No api environments specified", 1);       
+        }
+
+        if (!in_array($mode, array_keys(self::$environments))) {
             throw new Exception("Api mode not valid! Available modes is only test or prod. ", 1);       
         }
+
         $this->mode = $mode;
     }
 
@@ -131,34 +138,34 @@ class PaPara
 
         $requestBody = $this->getRequestBody();
 
-        $headers = [
+        $requestHeaders = array(
             'Content-type: text/xml; charset="utf-8"',
             'Host: ' . $_SERVER['HTTP_HOST'],
             'Content-length: ' . strlen($requestBody),
-            'POST /posservice/ApiRequest.asmx HTTP/1.1',
-        ];
+        );
 
+        $client = new GuzzleClient();
+        $res = $client->request('POST', $environments['url'], array(
+            'headers' => $requestHeaders,
+            'body' => $requestBody,
+        ));
+        
+        $response = json_decode($res->getBody());
 
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
-        curl_setopt($ch, CURLOPT_URL, $environments['url']);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $requestBody);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        var_dump($response);
+        exit();
 
-        $response = curl_exec($ch);
-        curl_close($ch);
+        if ($res->getStatusCode() == 200) {
+            // $response = simplexml_load_string($this->cleanResponse($response));
+        }else {
+            // Error
+        }
 
-        $response = simplexml_load_string($this->cleanResponse($response));
-
-        return (object) [
-            'message' => (string) $response->TransactionRequestResult->ResultMessage[0],
-            'code' => (string) $response->TransactionRequestResult->ResultCode[0],
-            'status' => (string) $response->TransactionRequestResult->ResultStatus,
-        ];
+        // return (object) array(
+        //     'message' => (string) $response->TransactionRequestResult->ResultMessage[0],
+        //     'code' => (string) $response->TransactionRequestResult->ResultCode[0],
+        //     'status' => (string) $response->TransactionRequestResult->ResultStatus,
+        // );
     }
 
     public function cleanResponse($response)
