@@ -2,12 +2,16 @@
 
 namespace UsameAvci\PaPara;
 
+
 use Exception;
 use SimpleXMLElement;
+use GuzzleHttp\Psr7\Request as GuzzleRequest;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\ClientException as GuzzleClientException;
 use GuzzleHttp\Exception\ServerException as GuzzleServerException;
 use GuzzleHttp\Exception\RequestException as GuzzleRequestException;
+
+error_reporting(E_ALL);
 
 /**
 * PaPara Api Class
@@ -111,12 +115,12 @@ class PaPara
             $TransactionRequest->addChild('key', $environments['key']);
             $TransactionRequest->addChild('walletno', $environments['walletno']);
             $TransactionRequest->addChild('referansId', $environments['referansId']);
-            $TransactionRequest->addChild('url', $environments['url']);
             $TransactionRequest->addChild('secret_key', $environments['secret_key']);
 
             $TransactionRequest->addChild('order_id', $this->getOrderId());
             $TransactionRequest->addChild('amount', $this->getAmount());
             $TransactionRequest->addChild('discount', $this->getAmount());
+            $TransactionRequest->addChild('url', $this->url);
 
             $shoppingVoucher = $TransactionRequest->addChild('shoppingVoucher');
             foreach ($this->shoppingVoucher->getItems() as $entity) {
@@ -142,25 +146,23 @@ class PaPara
         $requestBody = $this->getRequestBody();
 
         $requestHeaders = array(
-            'Content-Type' => 'text/xml; charset="utf-8"',
-            'Host' => $_SERVER['HTTP_HOST'],
-            'Content-Length' => strlen($requestBody),
+            'Content-Type' => 'text/xml; charset="utf-8"'
         );
 
-        $client = new GuzzleClient();
-
         try {
-            $response = $client->request('POST', $environments['url'], array(
-                'headers' => $requestHeaders,
-                'body' => $requestBody,
-            ));
+            $client = new GuzzleClient;
+            $request = new GuzzleRequest('POST', $environments['url'], $requestHeaders, $requestBody);
+            $response = $client->send($request);
+
             $responseBody = $response->getBody()->getContents();
             $response = $this->parseResponse($responseBody);
 
-            if ($response->ResultCode != '100') {
-                throw new PaParaException($response->ResultMessage);
-            } else {
+            if ($response->ResultCode == '100') {
+                header('Location: ' . $response->ResultObject);
+            } else if ($response->ResultCode == '200') {
                 return $response;
+            } else {
+                throw new PaParaException($response->ResultMessage);
             }
         } catch (GuzzleClientException $e) {
             $statusCode = $e->getResponse()->getStatusCode();
