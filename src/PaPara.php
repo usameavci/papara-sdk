@@ -2,7 +2,6 @@
 
 namespace UsameAvci\PaPara;
 
-
 use Exception;
 use SimpleXMLElement;
 use GuzzleHttp\Psr7\Request as GuzzleRequest;
@@ -10,8 +9,6 @@ use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\ClientException as GuzzleClientException;
 use GuzzleHttp\Exception\ServerException as GuzzleServerException;
 use GuzzleHttp\Exception\RequestException as GuzzleRequestException;
-
-error_reporting(E_ALL);
 
 /**
 * PaPara Api Class
