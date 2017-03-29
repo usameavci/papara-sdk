@@ -16,7 +16,7 @@ use GuzzleHttp\Exception\RequestException as GuzzleRequestException;
 class PaPara
 {
 
-    private $mode;
+    private static $mode = "test";
     private static $environments;
     private $order_id;
     private $amount;
@@ -24,7 +24,7 @@ class PaPara
     private $shoppingVoucher;
     private $url;
     
-    public function __construct($mode = 'test')
+    public function __construct($mode = "test")
     {
         if (count(self::$environments) < 1) {
             throw new PaParaException("No api environments specified", 1);       
@@ -34,7 +34,7 @@ class PaPara
             throw new PaParaException("Api mode not valid! Available modes is only test or prod. ", 1);       
         }
 
-        $this->mode = $mode;
+        self::$mode = $mode;
     }
 
     public static function setEnvironment($environments)
@@ -101,7 +101,7 @@ class PaPara
     {
         if (!$this->amount) $this->amount = $this->shoppingVoucher->getTotalAmount();
 
-        $environments = self::$environments[$this->mode];
+        $environments = self::$environments[self::$mode];
 
         $xmlHeader = '<?xml version="1.0"?><soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body>';
         $xmlFooter = '</soap12:Body></soap12:Envelope>';
@@ -138,7 +138,7 @@ class PaPara
 
     public function send()
     {
-        $environments = self::$environments[$this->mode];
+        $environments = self::$environments[self::$mode];
 
         $requestBody = $this->getRequestBody();
 
@@ -187,5 +187,34 @@ class PaPara
         $response = simplexml_load_string($response);
         $response = (object) json_decode(json_encode($response->TransactionRequestResult), 1);
         return $response;
+    }
+
+    public static function validate($param1, $param2 = "")
+    {
+        $environments = self::$environments[self::$mode];
+        if (!$environments)
+            throw new PaParaException('[' . self::$mode . '] environment not defined');
+
+        $secretKey = $environments['secret_key'];
+
+        if (is_array($param1)) {
+            $pre1 = $param1['pre1'];
+            $pre2 = $param1['pre2'];
+        }else{
+            $pre1 = $param1;
+            $pre2 = $param2;
+        }
+
+        $pre1_decoded   = base64_decode($pre1);
+        $orderId        = explode('+', $pre1_decoded)[0];
+        $statusCode     = explode('+', $pre1_decoded)[1];
+
+        $crypted_step1  = base64_encode($orderId . '+' . $statusCode);
+        $crypted_finish = strtoupper(md5($crypted_step1 . $secretKey));
+
+        if ($crypted_finish != $pre2) {
+            return false;
+        }
+        return true;
     }
 }
